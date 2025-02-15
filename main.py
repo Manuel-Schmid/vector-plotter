@@ -23,6 +23,7 @@ class VectorPlot3D(QMainWindow):
         settings_widget = QWidget()
         settings_layout = QFormLayout()
 
+        self.position_input = QLineEdit()
         self.vector_input = QLineEdit()
         self.vector_input.returnPressed.connect(self.add_custom_vector)
         self.error_label = QLabel()
@@ -32,21 +33,19 @@ class VectorPlot3D(QMainWindow):
         self.add_custom_vector_btn.clicked.connect(self.add_custom_vector)
         self.add_random_vector_btn = QPushButton("Add Random Vector")
         self.add_random_vector_btn.clicked.connect(self.add_random_vector)
-        self.add_random_plane_btn = QPushButton("Add Random Plane")
-        self.add_random_plane_btn.clicked.connect(self.add_random_plane)
 
-        settings_layout.addRow(QLabel("Enter Vector (x, y, z):"), self.vector_input)
+        settings_layout.addRow(QLabel("Enter Position Vector (x, y, z):"), self.position_input)
+        settings_layout.addRow(QLabel("Enter Direction Vector (x, y, z):"), self.vector_input)
         settings_layout.addRow(self.error_label)
         settings_layout.addRow(self.add_custom_vector_btn)
         settings_layout.addRow(self.add_random_vector_btn)
-        # settings_layout.addRow(self.add_random_plane_btn)
 
         # Toggle Format Button
         self.toggle_format_btn = QCheckBox("Parameter Form")
         self.toggle_format_btn.stateChanged.connect(self.update_display)
         settings_layout.addRow(self.toggle_format_btn)
 
-        # Display Vectors and Planes
+        # Display Vectors
         self.display_label = QLabel()
         settings_layout.addRow(self.display_label)
 
@@ -73,71 +72,70 @@ class VectorPlot3D(QMainWindow):
         self.view.addItem(grid)
 
         self.vectors = []
-        self.planes = []
         self.vector_data = []
 
     def add_custom_vector(self):
         try:
-            vector_text = self.vector_input.text()
-            vector_parts = [s.strip() for s in vector_text.split(",")]
-            if len(vector_parts) != 3:
+            pos_text = self.position_input.text()
+            vec_text = self.vector_input.text()
+
+            pos_parts = [s.strip() for s in pos_text.split(",")]
+            vec_parts = [s.strip() for s in vec_text.split(",")]
+            if len(vec_parts) != 3:
                 raise ValueError("Invalid vector input!")
 
-            x, y, z = map(float, vector_parts)
+            if len(pos_parts) == 3:
+                px, py, pz = map(float, pos_parts)
+            else:
+                px, py, pz = 0,0,0
+            vx, vy, vz = map(float, vec_parts)
+
             color = (0, 1, 0, 1)  # Green
             arrow = gl.GLLinePlotItem(
-                pos=np.array([[0, 0, 0], [x, y, z]]),
+                pos=np.array([[px, py, pz], [px + vx, py + vy, pz + vz]]),
                 color=color,
                 width=3,
                 mode='lines'
             )
             self.view.addItem(arrow)
             self.vectors.append(arrow)
-            self.vector_data.append([x, y, z])
+            self.vector_data.append(((px, py, pz), (vx, vy, vz)))
             self.update_display()
             self.error_label.setText("")  # Clear error message
             self.vector_input.clear()
+            self.position_input.clear()
         except ValueError:
             self.error_label.setText("Invalid vector input!")
 
     def add_random_vector(self):
-        vec = np.random.randint(-10, 11, size=3)  # 11 is exclusive, so it covers up to 10
+        px, py, pz = np.random.randint(-5, 6, size=3)
+        vx, vy, vz = np.random.randint(-10, 11, size=3) # 11 is exclusive, so it covers up to 10
         color = (1, 0, 0, 1)  # Red
 
         arrow = gl.GLLinePlotItem(
-            pos=np.array([[0, 0, 0], vec]),
+            pos=np.array([[px, py, pz], [px + vx, py + vy, pz + vz]]),
             color=color,
             width=3,
             mode='lines'
         )
         self.view.addItem(arrow)
         self.vectors.append(arrow)
-        self.vector_data.append(vec)
-        self.update_display()
-
-    def add_random_plane(self):
-        x = np.linspace(-2, 2, 10)
-        y = np.linspace(-2, 2, 10)
-        x, y = np.meshgrid(x, y)
-        z = np.zeros_like(x)  # Plane at z=0
-
-        pts = np.vstack((x.ravel(), y.ravel(), z.ravel())).T
-        mesh = gl.GLScatterPlotItem(pos=pts, color=(0, 0, 1, 0.3), size=2)
-        self.view.addItem(mesh)
-        self.planes.append(mesh)
+        self.vector_data.append(((px, py, pz), (vx, vy, vz)))
         self.update_display()
 
     def update_display(self):
         text = "Vectors:\n"
         is_parametric = self.toggle_format_btn.isChecked()
 
-        for i, vec in enumerate(self.vector_data):
+        for i, (pos, vec) in enumerate(self.vector_data):
+            px, py, pz = pos
+            vx, vy, vz = vec
             if is_parametric:
-                text += f"v{i}: (0,0,0) + t({format_number(vec[0])}, {format_number(vec[1])}, {format_number(vec[2])})\n"
+                text += f"v{i}: ({px},{py},{pz}) + t({format_number(vx)}, {format_number(vy)}, {format_number(vz)})\n"
             else:
-                text += f"v{i}: ({format_number(vec[0])}, {format_number(vec[1])}, {format_number(vec[2])})"
+                text += f"v{i}: ({px},{py},{pz}) + t({format_number(vx)}, {format_number(vy)}, {format_number(vz)})"
                 # magnitude (length):
-                magnitude = math.sqrt(vec[0]**2 + vec[1]**2 + vec[2]**2)
+                magnitude = math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
                 text += f" | m = {format_number(magnitude)}\n"
 
         self.display_label.setText(text)
