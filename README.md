@@ -1,3 +1,3 @@
 ## Create .exe: 
 
-    pyinstaller --onefile --windowed vector-plotter.py
+    pyinstaller --onefile --windowed main.py 
